@@ -1,5 +1,5 @@
 <h1>
-  <img src="logo.png" alt="" width="40" align="absmiddle"/>&nbsp;Claude TikTok
+  <img src="logo.png" alt="" width="32" align="absmiddle"/>&nbsp;Claude TikTok
 </h1>
 
 Claude Code plays a microwave ding sound when it needs you — then a short TikTok-voice recap of what it just said.
