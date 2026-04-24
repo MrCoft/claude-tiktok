@@ -1,7 +1,7 @@
 {
   "name": "claude-tiktok",
   "version": "1.0.0",
-  "description": "Plays a TikTok-voice spoken summary of Claude's last message when it stops or needs your input. Replaces the usual silence / terminal bell with a short, annoying soundbite announcing what's being asked.",
+  "description": "TikTok-voice spoken summary when Claude Code needs your input.",
   "author": {
     "name": "Ondřej Műller"
   },
@@ -9,7 +9,7 @@
     "api_key": {
       "type": "string",
       "title": "Anthropic API key",
-      "description": "Used for Haiku summarization. Get one at https://console.anthropic.com and load prepaid credits — Haiku 4.5 costs ~$0.0002 per summary. Billed separately from your Claude Code subscription.",
+      "description": "Used for Haiku summarization. Get one at https://console.anthropic.com and load prepaid credits — Haiku 4.5 costs ~$0.0002 per summary. Billed separately from your Claude Code subscription. $5 buys roughly 25,000 summaries.",
       "sensitive": true,
       "required": true
     }

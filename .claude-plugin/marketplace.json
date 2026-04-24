@@ -1,7 +1,8 @@
 {
-  "name": "claude-tiktok-local",
+  "name": "mrcoft",
   "owner": {
-    "name": "Ondřej Műller"
+    "name": "Ondřej Műller",
+    "url": "https://github.com/MrCoft"
   },
   "plugins": [
     {

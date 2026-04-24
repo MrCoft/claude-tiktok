@@ -2,7 +2,7 @@
   <img src="logo.png" alt="" width="60" align="absmiddle"/>&nbsp;Claude TikTok
 </h1>
 
-Claude Code plays a microwave ding sound when it needs you — then a short TikTok-voice recap of what it just said.
+TikTok-voice spoken summary when Claude Code needs your input.
 
 ## Requirements
 
@@ -12,9 +12,11 @@ Claude Code plays a microwave ding sound when it needs you — then a short TikT
 ## Install
 
 ```text
-/plugin marketplace add <source>
-/plugin install claude-tiktok@claude-tiktok-local
+/plugin marketplace add MrCoft/claude-tiktok
+/plugin install claude-tiktok@mrcoft
 ```
+
+You'll be prompted for your Anthropic API key (stored in OS secure storage).
 
 ## License
 

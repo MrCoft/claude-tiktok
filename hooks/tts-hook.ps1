@@ -1,16 +1,16 @@
 <#
-claude-tiktok hook script.
+claude-tiktok Stop hook.
 
-Stop mode:         reads last assistant message from transcript, summarizes with Haiku, speaks via TikTok TTS.
-Notification mode: speaks the notification message directly (no summarization).
+Flow: read last assistant message from the session transcript, summarize with
+Haiku, synthesize the summary via TikTok TTS, play the MP3 at 120% speed
+(pitch-preserved) through bundled mpg123 + SoX.
 
-Config is supplied by Claude Code as env vars (injected from plugin userConfig):
-  $env:CLAUDE_PLUGIN_OPTION_API_KEY     (required; Anthropic API key)
-  $env:CLAUDE_PLUGIN_OPTION_VOICE       (default en_us_001)
-  $env:CLAUDE_PLUGIN_OPTION_MAX_WORDS   (default 12)
+Config is the Anthropic API key, injected by Claude Code from plugin userConfig
+as $env:CLAUDE_PLUGIN_OPTION_API_KEY. Voice, max summary length, and playback
+speed are hardcoded (tweak the constants below).
 
-On any failure, plays a short console beep as a minimal fallback so the user isn't left in silence.
-Debug log: %TEMP%\claude-tiktok.log
+On any failure, plays the microwave ping as a minimal fallback so the user
+isn't left wondering. Debug log: %TEMP%\claude-tiktok.log
 #>
 param(
     [Parameter(Mandatory = $true)]
@@ -33,7 +33,7 @@ function Write-DebugLog {
     } catch {}
 }
 
-Write-DebugLog "hook fired; cwd=$($PWD.Path); keyLen=$($ApiKey.Length); voice=$Voice; maxWords=$MaxWords"
+Write-DebugLog "hook fired; cwd=$($PWD.Path); keyPresent=$([bool]$ApiKey)"
 
 function Play-Ping {
     try {
