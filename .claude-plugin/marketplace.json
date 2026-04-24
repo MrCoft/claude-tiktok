@@ -1,0 +1,13 @@
+{
+  "name": "claude-tiktok-local",
+  "owner": {
+    "name": "Ondřej Műller"
+  },
+  "plugins": [
+    {
+      "name": "claude-tiktok",
+      "source": "./",
+      "description": "TikTok-voice spoken summary when Claude Code needs your input."
+    }
+  ]
+}

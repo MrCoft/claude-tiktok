@@ -1,0 +1,16 @@
+{
+  "description": "TikTok TTS playback on Stop events",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/tts-hook.ps1\" -Mode Stop",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
