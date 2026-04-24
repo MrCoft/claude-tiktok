@@ -21,7 +21,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ApiKey       = $env:CLAUDE_PLUGIN_OPTION_API_KEY
-$MaxWords     = if ($env:CLAUDE_PLUGIN_OPTION_MAX_WORDS) { [int]$env:CLAUDE_PLUGIN_OPTION_MAX_WORDS } else { 9 }
+$MaxWords     = 9
 $Voice        = "en_us_001"
 $SpeedPercent = 120
 
