@@ -1,6 +1,10 @@
-# claude-tiktok
+<h1>
+  <img src="logo.png" alt="" width="40"/> Claude TikTok
+</h1>
 
-Whenever Claude Code requires your attention, plays a microwave ding sound, followed by a short TikTok-voice summary of Claude's last message.
+---
+
+Claude Code plays a microwave ding sound when it needs you — then a short TikTok-voice recap of what it just said.
 
 ## Requirements
 
