@@ -31,7 +31,7 @@ from pathlib import Path
 API_KEY = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY", "")
 MAX_WORDS = 9
 VOICE = "en_us_001"
-SPEED_PERCENT = 120
+SPEED_PERCENT = 130
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PLUGIN_ROOT = SCRIPT_DIR.parent
@@ -98,7 +98,9 @@ def play_mp3_sync(mp3_path: Path) -> None:
         capture_output=True,
     ).returncode
     if rc != 0:
-        raise RuntimeError(f"sox failed (exit {rc})")
+        log(f"sox failed (exit {rc}); playing un-sped wav")
+        play_wav_sync(decoded)
+        return
 
     play_wav_sync(sped)
     log(f"sox tempo={tempo} played")
