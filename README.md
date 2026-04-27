@@ -6,7 +6,9 @@ TikTok-voice spoken summary when Claude Code needs your input.
 
 ## Requirements
 
-- Windows
+- **Python 3.9+** available as `python3` on `PATH`
+  - Windows: install from the Microsoft Store ([Python 3](https://apps.microsoft.com/detail/9pnrbtzxmb4z))
+  - macOS: install via Homebrew (`brew install python`) or the Xcode Command Line Tools (`xcode-select --install`).
 - **Anthropic API key** with prepaid credits (separate from your Claude Code subscription; ~$0.0002 per summary via Haiku 4.5 — $5 buys roughly 25,000 summaries)
 
 ## Install
