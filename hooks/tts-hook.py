@@ -173,7 +173,7 @@ def invoke_haiku(text: str) -> str:
 def invoke_tiktok_tts(text: str) -> Path:
     body = {"text": text, "voice": VOICE}
     resp = _post_json(
-        "https://tiktok-tts.weilnet.workers.dev/api/generation",
+        "https://ottsy.weilbyte.dev/api/generation",
         body,
         headers={},
         timeout=10.0,
