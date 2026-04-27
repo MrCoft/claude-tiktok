@@ -82,6 +82,15 @@ def play_mp3_sync(mp3_path: Path) -> None:
     if not mpg123.exists() or not sox.exists():
         raise FileNotFoundError(f"missing decoder/sox in {BIN_DIR}")
 
+    if IS_MAC:
+        for b in (mpg123, sox):
+            os.chmod(b, 0o755)
+            subprocess.run(
+                ["xattr", "-d", "com.apple.quarantine", str(b)],
+                capture_output=True,
+                check=False,
+            )
+
     decoded = TEMP_DIR / "claude-tiktok-decoded.wav"
     sped = TEMP_DIR / "claude-tiktok-sped.wav"
 
