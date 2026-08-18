@@ -1,6 +1,6 @@
 {
   "name": "claude-tiktok",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TikTok-voice spoken summary when Claude Code needs your input.",
   "author": {
     "name": "Ondřej Műller"
@@ -9,9 +9,9 @@
     "api_key": {
       "type": "string",
       "title": "Anthropic API key",
-      "description": "Used for Haiku summarization. Get one at https://console.anthropic.com and load prepaid credits — Haiku 4.5 costs ~$0.0002 per summary. Billed separately from your Claude Code subscription. $5 buys roughly 25,000 summaries.",
+      "description": "Optional. With a key you get a spoken summary of what Claude said; leave it empty and you just get the ding, with no API calls at all. Get one at https://console.anthropic.com and load prepaid credits — Haiku 4.5 costs ~$0.0002 per summary. Billed separately from your Claude Code subscription. $5 buys roughly 25,000 summaries.",
       "sensitive": true,
-      "required": true
+      "required": false
     }
   }
 }

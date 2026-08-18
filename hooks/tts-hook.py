@@ -2,20 +2,26 @@
 """
 claude-tiktok Stop hook (cross-platform).
 
-Read last assistant message from session transcript, summarize with Haiku,
-synthesize via TikTok TTS, decode + apply 1.2x pitch-preserving tempo,
-play via winsound (Windows) or afplay (macOS) using bundled mpg123 + SoX.
+Fires when Claude finishes a turn, but stays quiet while background work is
+still running, so it only speaks up when the turn is really yours again.
 
-Config: API key injected by Claude Code from plugin userConfig as
-CLAUDE_PLUGIN_OPTION_API_KEY. Voice, max words, and speed are constants
-below.
+With an API key (plugin userConfig, arriving as CLAUDE_PLUGIN_OPTION_API_KEY) it
+reads a TikTok-voice summary of the last assistant message. Without one it just
+plays the microwave ping and makes no network calls at all.
 
-On any failure: log it, play microwave-ping.wav fallback, exit 0 so the
-user isn't left wondering. Debug log: <tempdir>/claude-tiktok.log
+Voice, max words and speed are constants below.
+
+Summaries switch themselves off after an auth/credit failure so a dead key
+isn't retried every turn. The block is keyed to the key's fingerprint, so
+pasting a different key clears it.
+
+On any failure: log it, play microwave-ping.wav so the user isn't left
+wondering, exit 0. Debug log: <tempdir>/claude-tiktok.log
 """
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import subprocess
@@ -28,7 +34,6 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-API_KEY = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY", "")
 MAX_WORDS = 9
 VOICE = "en_us_001"
 SPEED_PERCENT = 130
@@ -42,16 +47,68 @@ BIN_DIR = PLUGIN_ROOT / "bin" / PLATFORM_DIR
 PING_PATH = SCRIPT_DIR / "microwave-ping.wav"
 TEMP_DIR = Path(tempfile.gettempdir())
 LOG_PATH = TEMP_DIR / "claude-tiktok.log"
+LOG_MAX_BYTES = 512 * 1024
+STATE_PATH = TEMP_DIR / "claude-tiktok-state.json"
+
+# Task types that mean "Claude will wake itself up again", so the turn isn't
+# really over. Names are the payload's display types; raw registry types are
+# matched too in case that mapping changes. auto-mode scan and dream are
+# internal housekeeping rather than the user's work, so they don't hold the
+# notification back.
+BLOCKING_TASK_TYPES = {
+    "subagent", "local_agent",
+    "workflow", "local_workflow",
+    "shell", "local_bash",
+    "monitor", "monitor_mcp", "monitor_ws",
+    "MCP task", "mcp_task",
+    "teammate", "in_process_teammate",
+    "cloud session", "remote_agent",
+}
+
+
+API_KEY = os.environ.get("CLAUDE_PLUGIN_OPTION_API_KEY", "").strip()
 
 
 def log(msg: str) -> None:
     try:
+        if LOG_PATH.exists() and LOG_PATH.stat().st_size > LOG_MAX_BYTES:
+            tail = LOG_PATH.read_bytes()[-LOG_MAX_BYTES // 2:]
+            LOG_PATH.write_bytes(b"[log truncated]\n" + tail)
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with LOG_PATH.open("a", encoding="utf-8") as f:
             f.write(f"{ts} [Stop] [pid {os.getpid()}] {msg}\n")
     except Exception:
         pass
 
+
+def key_fingerprint() -> str:
+    if not API_KEY:
+        return ""
+    return hashlib.sha256(API_KEY.encode("utf-8")).hexdigest()[:16]
+
+
+def summaries_blocked_reason() -> str | None:
+    """Why this key's summaries are switched off, or None if they're live."""
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if state.get("disabled_key") and state["disabled_key"] == key_fingerprint():
+        return state.get("reason", "an earlier API failure")
+    return None
+
+
+def block_summaries(reason: str) -> None:
+    try:
+        STATE_PATH.write_text(
+            json.dumps({"disabled_key": key_fingerprint(), "reason": reason}),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        log(f"could not write state file: {exc}")
+
+
+# --- playback ---------------------------------------------------------------
 
 def play_wav_sync(path: Path) -> None:
     if IS_WIN:
@@ -67,10 +124,6 @@ def play_ping() -> None:
             play_wav_sync(PING_PATH)
     except Exception as exc:
         log(f"play_ping failed: {exc}")
-
-
-def play_fallback() -> None:
-    play_ping()
 
 
 def play_mp3_sync(mp3_path: Path) -> None:
@@ -115,6 +168,30 @@ def play_mp3_sync(mp3_path: Path) -> None:
     log(f"sox tempo={tempo} played")
 
 
+# --- turn inspection --------------------------------------------------------
+
+def live_background_tasks(payload: dict) -> list[dict]:
+    """Background work that will wake Claude up again after this Stop.
+
+    Claude Code lists every running or pending backgrounded task in the Stop
+    payload. An absent key means a build that doesn't report them, in which
+    case we can't tell and treat the turn as finished.
+    """
+    tasks = payload.get("background_tasks")
+    if not isinstance(tasks, list):
+        return []
+    return [
+        t for t in tasks
+        if isinstance(t, dict) and t.get("type") in BLOCKING_TASK_TYPES
+    ]
+
+
+def describe_tasks(tasks: list[dict]) -> str:
+    return ", ".join(
+        f"{t.get('type')}:{(t.get('description') or '?')[:40]}" for t in tasks
+    )
+
+
 def get_last_assistant_text(transcript_path: str) -> str | None:
     p = Path(transcript_path)
     if not p.exists():
@@ -139,6 +216,16 @@ def get_last_assistant_text(transcript_path: str) -> str | None:
     return None
 
 
+def turn_text(payload: dict) -> str | None:
+    text = (payload.get("last_assistant_message") or "").strip()
+    if text:
+        return text
+    transcript = payload.get("transcript_path")
+    return get_last_assistant_text(transcript) if transcript else None
+
+
+# --- APIs -------------------------------------------------------------------
+
 def _post_json(url: str, body: dict, headers: dict, timeout: float) -> dict:
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
@@ -152,8 +239,6 @@ def _post_json(url: str, body: dict, headers: dict, timeout: float) -> dict:
 
 
 def invoke_haiku(text: str) -> str:
-    if not API_KEY:
-        raise RuntimeError("CLAUDE_PLUGIN_OPTION_API_KEY not set")
     prompt = (
         f"Summarize the message below in one short sentence (max {MAX_WORDS} words) "
         "to be spoken aloud. Lead with what happened and end with what's needed from "
@@ -177,6 +262,17 @@ def invoke_haiku(text: str) -> str:
         except Exception:
             pass
         log(f"HAIKU ERROR status={exc.code} body: {body_text}")
+        # A rejected or unfunded key fails the same way on every later turn, so
+        # stop asking. Rate limits and server errors are transient, keep those.
+        fatal = exc.code in (401, 403) or (
+            exc.code == 400 and "credit balance" in body_text.lower()
+        )
+        if fatal:
+            block_summaries(f"HTTP {exc.code} from the Anthropic API")
+            log(
+                "voice summaries switched off for this key; ping only from now "
+                f"on. Paste a working key, or delete {STATE_PATH}, to re-enable."
+            )
         raise
     return resp["content"][0]["text"].strip()
 
@@ -196,47 +292,71 @@ def invoke_tiktok_tts(text: str) -> Path:
     return mp3_path
 
 
+# --- main -------------------------------------------------------------------
+
+def summary_skip_reason() -> str | None:
+    if not API_KEY:
+        return "no API key configured"
+    return summaries_blocked_reason()
+
+
+def announce(payload: dict) -> None:
+    skip = summary_skip_reason()
+    if skip:
+        log(f"ping only ({skip})")
+        play_ping()
+        return
+
+    text = turn_text(payload)
+    if not text:
+        log("no assistant text found -> ping")
+        play_ping()
+        return
+    log(f"got text len={len(text)}")
+
+    # A summary is a nicety; a network or API hiccup shouldn't cost the user
+    # their notification, and the reason is already logged where it happened.
+    try:
+        summary = invoke_haiku(text[:4000])
+        if not summary:
+            log("haiku returned empty -> ping")
+            play_ping()
+            return
+        log(f"summary: {summary}")
+        mp3 = invoke_tiktok_tts(summary)
+        log(f"mp3 written: {mp3} ({mp3.stat().st_size} bytes)")
+    except (urllib.error.URLError, OSError, ValueError, KeyError, RuntimeError) as exc:
+        log(f"summary unavailable ({type(exc).__name__}: {exc}) -> ping")
+        play_ping()
+        return
+
+    play_mp3_sync(mp3)
+    log("playback done")
+
+
 def main() -> int:
     log(
-        f"hook fired; cwd={os.getcwd()}; keyPresent={bool(API_KEY)}; "
-        f"platform={sys.platform}"
+        f"hook fired; cwd={os.getcwd()}; platform={sys.platform}; "
+        f"keyPresent={bool(API_KEY)}"
     )
     try:
         stdin_data = sys.stdin.read()
-        log(f"stdin bytes={len(stdin_data)}")
-        hook_input = json.loads(stdin_data) if stdin_data else None
+        payload = json.loads(stdin_data) if stdin_data.strip() else {}
+        if not isinstance(payload, dict):
+            payload = {}
+        log(f"stdin bytes={len(stdin_data)}; keys={sorted(payload)}")
 
-        if not hook_input or not hook_input.get("transcript_path"):
-            log("no transcript_path in payload -> fallback")
-            play_fallback()
+        pending = live_background_tasks(payload)
+        if pending:
+            log(f"silent: {len(pending)} live -> {describe_tasks(pending)}")
             return 0
 
-        text = get_last_assistant_text(hook_input["transcript_path"])
-        if not text:
-            log("no assistant text found -> fallback")
-            play_fallback()
-            return 0
-        log(f"got text len={len(text)}")
-        if len(text) > 4000:
-            text = text[:4000]
-
-        summary = invoke_haiku(text)
-        if not summary:
-            log("haiku returned empty -> fallback")
-            play_fallback()
-            return 0
-        log(f"summary: {summary}")
-
-        mp3 = invoke_tiktok_tts(summary)
-        log(f"mp3 written: {mp3} ({mp3.stat().st_size} bytes)")
-
-        play_mp3_sync(mp3)
-        log("playback done")
+        announce(payload)
         return 0
     except Exception as exc:
         log(f"EXCEPTION: {exc}\n{traceback.format_exc()}")
         try:
-            play_fallback()
+            play_ping()
         except Exception:
             pass
         return 0
